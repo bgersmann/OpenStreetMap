@@ -1,0 +1,131 @@
+{
+    "elements": [
+        {
+            "type": "Label",
+            "caption": "Hausposition"
+        },
+        {
+            "name": "LocationControlID",
+            "type": "SelectInstance",
+            "caption": "Location Control Instanz (Kern Instanzen -> Location)"
+        },
+        {
+            "name": "MapZoom",
+            "type": "NumberSpinner",
+            "caption": "Standard Zoomstufe",
+            "suffix": "x",
+            "minimum": 3,
+            "maximum": 20
+        },
+        {
+            "type": "Label",
+            "caption": "Punkte auf der Karte"
+        },
+        {
+            "name": "Points",
+            "type": "List",
+            "caption": "Markierungen",
+            "rowCount": 6,
+            "add": true,
+            "delete": true,
+            "sort": {
+                "column": "Name",
+                "direction": "ascending"
+            },
+            "columns": [
+                {
+                    "caption": "Name",
+                    "name": "Name",
+                    "width": "200px",
+                    "add": "Neuer Punkt",
+                    "edit": {
+                        "type": "ValidationTextBox"
+                    }
+                },
+                {
+                    "caption": "Latitude Variable",
+                    "name": "LatitudeID",
+                    "width": "200px",
+                    "add": 0,
+                    "edit": {
+                        "type": "SelectObject",
+                        "objectType": 2
+                    }
+                },
+                {
+                    "caption": "Longitude Variable",
+                    "name": "LongitudeID",
+                    "width": "200px",
+                    "add": 0,
+                    "edit": {
+                        "type": "SelectObject",
+                        "objectType": 2
+                    }
+                },
+                {
+                    "caption": "Icon (optional)",
+                    "name": "Icon",
+                    "width": "230px",
+                    "add": "",
+                    "edit": {
+                        "type": "Select",
+                        "options": [
+                            {
+                                "caption": "Standard (Kreis)",
+                                "value": ""
+                            },
+                            {
+                                "caption": "Feuerwehr",
+                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/firestation.svg"
+                            },
+                            {
+                                "caption": "Krankenhaus",
+                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/hospital.svg"
+                            },
+                            {
+                                "caption": "Polizei",
+                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/police.svg"
+                            },
+                            {
+                                "caption": "Parkplatz",
+                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/parking.svg"
+                            },
+                            {
+                                "caption": "Schule",
+                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/school.svg"
+                            },
+                            {
+                                "caption": "Post",
+                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/post_office.svg"
+                            },
+                            {
+                                "caption": "Restaurant",
+                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/restaurant.svg"
+                            },
+                            {
+                                "caption": "Aussichtspunkt",
+                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/tourism/viewpoint.svg"
+                            },
+                            {
+                                "caption": "Information",
+                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/tourism/information.svg"
+                            },
+                            {
+                                "caption": "Hund",
+                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/shop/pet.svg"
+                            },
+                            {
+                                "caption": "Nadel",
+                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/leisure/golf_pin.svg"
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    ],
+    "actions": [
+    ],
+    "status": [
+    ]
+}

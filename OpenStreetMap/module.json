@@ -1,0 +1,16 @@
+{
+    "id": "{1A6CF808-787A-A893-196A-44EBB7EA257A}",
+    "name": "OpenStreetMap",
+    "url": "http://symcon.de",
+    "type": 3,
+    "vendor": "OSMF",
+    "aliases": [
+    ],
+    "parentRequirements": [
+    ],
+    "childRequirements": [
+    ],
+    "implemented": [
+    ],
+    "prefix": "OSM"
+}

@@ -1,0 +1,12 @@
+{
+    "id": "{06B07F79-393E-6417-A143-6E471B5626F1}",
+    "name": "OpenStreetMap",
+    "author": "BGersmann",
+    "url": "https://symcon.de",
+    "compatibility": {
+        "version": "8.2"
+    },
+    "version": "1.0",
+    "build": 202602041719,
+    "date": 1770221946
+}
