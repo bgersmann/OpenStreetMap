@@ -26,6 +26,7 @@ class OpenStreetMap extends IPSModule
             'zoom' => 6
         ]));
         $this->RegisterPropertyString('Points', '[]');
+        $this->RegisterPropertyString('FixedPoints', '[]');
     }
 
     /**
@@ -73,7 +74,7 @@ class OpenStreetMap extends IPSModule
     {
         $payload = [
             'house' => $this->GetHouseLocation(),
-            'points' => $this->GetConfiguredPoints()
+            'points' => $this->GetAllPoints()
         ];
 
         $this->SendDebug(__FUNCTION__, json_encode($payload), 0);
@@ -258,6 +259,50 @@ class OpenStreetMap extends IPSModule
         return $result;
     }
 
+    private function GetAllPoints(): array
+    {
+        return array_merge($this->GetFixedPoints(), $this->GetConfiguredPoints());
+    }
+
+    private function GetFixedPoints(): array
+    {
+        $points = json_decode($this->ReadPropertyString('FixedPoints'), true);
+        if (!is_array($points)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($points as $index => $point) {
+            if (!is_array($point)) {
+                continue;
+            }
+
+            $latitude = $this->NormalizeCoordinate($point['Latitude'] ?? null);
+            $longitude = $this->NormalizeCoordinate($point['Longitude'] ?? null);
+
+            if ($latitude === null || $longitude === null) {
+                $this->SendDebug(__FUNCTION__, sprintf('Skipping fixed point %d due to invalid coordinates', $index), 0);
+                continue;
+            }
+
+            $name = trim((string)($point['Name'] ?? ''));
+            if ($name === '') {
+                $name = sprintf('Fester Punkt %d', $index + 1);
+            }
+
+            $icon = $this->NormalizeIconUrl($point['Icon'] ?? '');
+
+            $result[] = [
+                'name' => $name,
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+                'icon' => $icon
+            ];
+        }
+
+        return $result;
+    }
+
     private function NormalizeIconUrl($icon): ?string
     {
         if (!is_string($icon)) {
@@ -284,6 +329,19 @@ class OpenStreetMap extends IPSModule
         }
 
         return $trimmed;
+    }
+
+    private function NormalizeCoordinate($value): ?float
+    {
+        if (is_string($value)) {
+            $value = str_replace(',', '.', $value);
+        }
+
+        if (!is_numeric($value)) {
+            return null;
+        }
+
+        return (float)$value;
     }
 
     private function MaintainReferences(): void

@@ -120,20 +120,14 @@
             function updateHouseMarker(house) {
                 const latitude = typeof house.latitude === 'number' ? house.latitude : defaults.latitude;
                 const longitude = typeof house.longitude === 'number' ? house.longitude : defaults.longitude;
-                const zoom = typeof house.zoom === 'number' ? house.zoom : undefined;
+                const targetZoom = typeof house.zoom === 'number' ? house.zoom : defaults.zoom;
                 const label = (house.label && house.label.trim()) || defaults.label;
 
                 if (!mapInstance) {
-                    initializeMap({ latitude, longitude, zoom: zoom ?? defaults.zoom });
+                    initializeMap({ latitude, longitude, zoom: targetZoom });
                 }
 
                 const coordinates = [latitude, longitude];
-
-                if (zoom) {
-                    mapInstance.setView(coordinates, zoom);
-                } else {
-                    mapInstance.panTo(coordinates);
-                }
 
                 if (houseMarker) {
                     houseMarker.setLatLng(coordinates).setPopupContent(`<strong>${label}</strong>`);
@@ -142,7 +136,6 @@
                         .bindPopup(`<strong>${label}</strong>`)
                         .addTo(mapInstance);
                 }
-
             }
 
             function updatePointLayer(points) {
@@ -189,11 +182,52 @@
 
             }
 
+            // Keep viewport adjusted so that all markers remain visible.
+            function fitMapToContent(house, points) {
+                if (!mapInstance) {
+                    return;
+                }
+
+                const latLngs = [];
+
+                if (Array.isArray(points)) {
+                    points.forEach((point) => {
+                        if (typeof point.latitude === 'number' && typeof point.longitude === 'number') {
+                            latLngs.push([point.latitude, point.longitude]);
+                        }
+                    });
+                }
+
+                const hasHouse = typeof house.latitude === 'number' && typeof house.longitude === 'number';
+                const houseCoordinates = hasHouse ? [house.latitude, house.longitude] : null;
+                const fallbackZoom = typeof house.zoom === 'number' ? house.zoom : defaults.zoom;
+
+                if (houseCoordinates) {
+                    latLngs.push(houseCoordinates);
+                }
+
+                if (latLngs.length === 0) {
+                    return;
+                }
+
+                if (latLngs.length === 1) {
+                    mapInstance.setView(latLngs[0], fallbackZoom);
+                    return;
+                }
+
+                const bounds = L.latLngBounds(latLngs);
+                mapInstance.fitBounds(bounds.pad(0.12), {
+                    animate: true,
+                    maxZoom: 18
+                });
+            }
+
             function processPayload(payload) {
                 const house = payload.house || {};
                 const points = payload.points || [];
                 updateHouseMarker(house);
                 updatePointLayer(points);
+                fitMapToContent(house, points);
             }
 
             document.addEventListener('DOMContentLoaded', () => {
