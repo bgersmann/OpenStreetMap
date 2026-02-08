@@ -5,6 +5,10 @@ declare(strict_types=1);
 // CLASS OpenStreetMap
 class OpenStreetMap extends IPSModule
 {
+    private const ARCHIVE_MODULE_GUID = '{43192F0B-135B-4CE7-A0A7-1475603F3060}';
+    private const DEFAULT_TRAIL_MINUTES = 60;
+    private const DEFAULT_TRAIL_POINTS = 200;
+    private const TRAIL_TOLERANCE_SECONDS = 60;
 
     /**
      * In contrast to Construct, this function is called only once when creating the instance and starting IP-Symcon.
@@ -223,6 +227,9 @@ class OpenStreetMap extends IPSModule
         }
 
         $result = [];
+        $archiveID = null;
+        $archiveLookupDone = false;
+        $archiveWarningIssued = false;
         foreach ($points as $index => $point) {
             $latID = (int)($point['LatitudeID'] ?? 0);
             $lonID = (int)($point['LongitudeID'] ?? 0);
@@ -248,11 +255,33 @@ class OpenStreetMap extends IPSModule
 
             $icon = $this->NormalizeIconUrl($point['Icon'] ?? '');
 
+            $trailCoordinates = [];
+            $trailEnabled = (bool)($point['TrackEnabled'] ?? false);
+            if ($trailEnabled) {
+                if (!$archiveLookupDone) {
+                    $archiveID = $this->GetArchiveControlID();
+                    $archiveLookupDone = true;
+                }
+
+                if ($archiveID === null) {
+                    if (!$archiveWarningIssued) {
+                        $this->SendDebug(__FUNCTION__, 'Archive Control instance missing. Trails cannot be generated.', 0);
+                        $archiveWarningIssued = true;
+                    }
+                } else {
+                    $trailMinutes = $this->NormalizeTrailMinutes($point['TrackMinutes'] ?? null);
+                    $trailMaxPoints = $this->NormalizeTrailMaxPoints($point['TrackMaxPoints'] ?? null);
+                    $trailCoordinates = $this->BuildTrailCoordinates($archiveID, $latID, $lonID, $trailMinutes, $trailMaxPoints);
+                }
+            }
+
             $result[] = [
                 'name' => $name,
                 'latitude' => (float)$latitude,
                 'longitude' => (float)$longitude,
-                'icon' => $icon
+                'icon' => $icon,
+                'trail' => $trailCoordinates,
+                'includeInZoom' => array_key_exists('IncludeInZoom', $point) ? (bool)$point['IncludeInZoom'] : true
             ];
         }
 
@@ -296,7 +325,8 @@ class OpenStreetMap extends IPSModule
                 'name' => $name,
                 'latitude' => $latitude,
                 'longitude' => $longitude,
-                'icon' => $icon
+                'icon' => $icon,
+                'includeInZoom' => array_key_exists('IncludeInZoom', $point) ? (bool)$point['IncludeInZoom'] : true
             ];
         }
 
@@ -378,5 +408,168 @@ class OpenStreetMap extends IPSModule
         }
 
         return array_keys($ids);
+    }
+
+    private function GetArchiveControlID(): ?int
+    {
+        if (!function_exists('IPS_GetInstanceListByModuleID')) {
+            return null;
+        }
+
+        $instances = IPS_GetInstanceListByModuleID(self::ARCHIVE_MODULE_GUID);
+        foreach ($instances as $instanceID) {
+            if (IPS_InstanceExists($instanceID)) {
+                return $instanceID;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Builds a simplified trail for a point by querying archived latitude/longitude values.
+     */
+    private function BuildTrailCoordinates(int $archiveID, int $latitudeID, int $longitudeID, int $durationMinutes, int $maxPoints): array
+    {
+        if (!function_exists('AC_GetLoggedValues')) {
+            return [];
+        }
+
+        $endTime = time();
+        $startTime = $endTime - ($durationMinutes * 60);
+
+        try {
+            $latValues = AC_GetLoggedValues($archiveID, $latitudeID, $startTime, $endTime, 0);
+            $lonValues = AC_GetLoggedValues($archiveID, $longitudeID, $startTime, $endTime, 0);
+        } catch (\Throwable $exception) {
+            $this->SendDebug(__FUNCTION__, sprintf('Archive query failed: %s', $exception->getMessage()), 0);
+            return [];
+        }
+
+        if (!is_array($latValues) || !is_array($lonValues) || $latValues === [] || $lonValues === []) {
+            return [];
+        }
+
+        $lonByTimestamp = [];
+        foreach ($lonValues as $entry) {
+            if (!isset($entry['TimeStamp']) || !isset($entry['Value'])) {
+                continue;
+            }
+            $lonByTimestamp[(int)$entry['TimeStamp']] = (float)$entry['Value'];
+        }
+
+        if ($lonByTimestamp === []) {
+            return [];
+        }
+
+        $trail = [];
+        foreach ($latValues as $entry) {
+            if (!isset($entry['TimeStamp']) || !isset($entry['Value'])) {
+                continue;
+            }
+            $timestamp = (int)$entry['TimeStamp'];
+            $longitudeValue = $this->ResolveLongitudeValue($lonByTimestamp, $timestamp, self::TRAIL_TOLERANCE_SECONDS);
+            if ($longitudeValue === null) {
+                continue;
+            }
+
+            $trail[] = [
+                'latitude' => (float)$entry['Value'],
+                'longitude' => $longitudeValue,
+                'timestamp' => $timestamp
+            ];
+        }
+
+        if (count($trail) <= 1) {
+            return [];
+        }
+
+        return $this->LimitTrailPoints($trail, $maxPoints);
+    }
+
+    private function ResolveLongitudeValue(array $lonByTimestamp, int $timestamp, int $toleranceSeconds): ?float
+    {
+        if (isset($lonByTimestamp[$timestamp])) {
+            return $lonByTimestamp[$timestamp];
+        }
+
+        for ($offset = 1; $offset <= $toleranceSeconds; $offset++) {
+            $lower = $timestamp - $offset;
+            if ($lower >= 0 && isset($lonByTimestamp[$lower])) {
+                return $lonByTimestamp[$lower];
+            }
+
+            $upper = $timestamp + $offset;
+            if (isset($lonByTimestamp[$upper])) {
+                return $lonByTimestamp[$upper];
+            }
+        }
+
+        return null;
+    }
+
+    private function LimitTrailPoints(array $trail, int $maxPoints): array
+    {
+        if ($maxPoints <= 0) {
+            return $trail;
+        }
+
+        $total = count($trail);
+        if ($total <= $maxPoints) {
+            return $trail;
+        }
+
+        $step = max(1, (int)floor($total / $maxPoints));
+        $filtered = [];
+        for ($i = 0; $i < $total; $i += $step) {
+            $filtered[] = $trail[$i];
+        }
+
+        $lastTrailPoint = $trail[$total - 1];
+        if ($filtered === [] || $filtered[count($filtered) - 1]['timestamp'] !== $lastTrailPoint['timestamp']) {
+            $filtered[] = $lastTrailPoint;
+        }
+
+        if (count($filtered) > $maxPoints) {
+            $filtered = array_slice($filtered, -$maxPoints);
+        }
+
+        return array_values($filtered);
+    }
+
+    private function NormalizeTrailMinutes($value): int
+    {
+        $minutes = (int)$value;
+        if ($minutes <= 0) {
+            $minutes = self::DEFAULT_TRAIL_MINUTES;
+        }
+
+        if ($minutes < 5) {
+            return 5;
+        }
+
+        if ($minutes > 1440) {
+            return 1440;
+        }
+
+        return $minutes;
+    }
+
+    private function NormalizeTrailMaxPoints($value): int
+    {
+        $points = (int)$value;
+        if ($points <= 0) {
+            $points = self::DEFAULT_TRAIL_POINTS;
+        }
+
+        if ($points < 20) {
+            return 20;
+        }
+
+        if ($points > 500) {
+            return 500;
+        }
+
+        return $points;
     }
 }

@@ -79,6 +79,8 @@
             let mapInstance = null;
             let houseMarker = null;
             const pointLayer = L.layerGroup();
+            const trailLayer = L.layerGroup();
+            const defaultTrailColors = ['#ff6b35', '#ffd166', '#06d6a0', '#118ab2', '#9b5de5', '#ef476f'];
             const defaults = {
                 latitude: 51.1657,
                 longitude: 15.4515,
@@ -113,6 +115,7 @@
                     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 }).addTo(mapInstance);
 
+                trailLayer.addTo(mapInstance);
                 pointLayer.addTo(mapInstance);
                 L.control.zoom({ position: 'topright' }).addTo(mapInstance);
             }
@@ -140,9 +143,10 @@
 
             function updatePointLayer(points) {
                 pointLayer.clearLayers();
+                trailLayer.clearLayers();
                 const validPoints = Array.isArray(points) ? points : [];
 
-                validPoints.forEach((point) => {
+                validPoints.forEach((point, index) => {
                     if (typeof point.latitude !== 'number' || typeof point.longitude !== 'number') {
                         return;
                     }
@@ -178,8 +182,45 @@
                     marker.addTo(pointLayer);
                     const popupHtml = `<strong>${label}</strong><br>Lat: ${point.latitude.toFixed(5)}<br>Lon: ${point.longitude.toFixed(5)}`;
                     marker.bindPopup(popupHtml);
+
+                    const trailLatLngs = getTrailLatLngs(point);
+                    if (trailLatLngs.length > 1) {
+                        L.polyline(trailLatLngs, {
+                            color: resolveTrailColor(point, index),
+                            weight: 3,
+                            opacity: 0.65,
+                            lineJoin: 'round',
+                            lineCap: 'round'
+                        }).addTo(trailLayer);
+                    }
                 });
 
+            }
+
+            function getTrailLatLngs(point) {
+                if (!point || !Array.isArray(point.trail)) {
+                    return [];
+                }
+
+                return point.trail
+                    .filter((segment) => typeof segment.latitude === 'number' && typeof segment.longitude === 'number')
+                    .map((segment) => [segment.latitude, segment.longitude]);
+            }
+
+            function resolveTrailColor(point, index) {
+                if (point && typeof point.trailColor === 'string' && point.trailColor.trim() !== '') {
+                    return point.trailColor.trim();
+                }
+
+                return defaultTrailColors[index % defaultTrailColors.length];
+            }
+
+            function shouldIncludeInZoom(point) {
+                if (!point) {
+                    return true;
+                }
+
+                return point.includeInZoom !== false;
             }
 
             // Keep viewport adjusted so that all markers remain visible.
@@ -192,8 +233,20 @@
 
                 if (Array.isArray(points)) {
                     points.forEach((point) => {
+                        if (!shouldIncludeInZoom(point)) {
+                            return;
+                        }
+
                         if (typeof point.latitude === 'number' && typeof point.longitude === 'number') {
                             latLngs.push([point.latitude, point.longitude]);
+                        }
+
+                        if (Array.isArray(point.trail)) {
+                            point.trail.forEach((segment) => {
+                                if (typeof segment.latitude === 'number' && typeof segment.longitude === 'number') {
+                                    latLngs.push([segment.latitude, segment.longitude]);
+                                }
+                            });
                         }
                     });
                 }

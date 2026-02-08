@@ -120,6 +120,46 @@
                             }
                         ]
                     }
+                },
+                {
+                    "caption": "Verlauf aktiv",
+                    "name": "TrackEnabled",
+                    "width": "120px",
+                    "add": false,
+                    "edit": {
+                        "type": "CheckBox"
+                    }
+                },
+                {
+                    "caption": "Dauer (Minuten)",
+                    "name": "TrackMinutes",
+                    "width": "140px",
+                    "add": 60,
+                    "edit": {
+                        "type": "NumberSpinner",
+                        "minimum": 5,
+                        "maximum": 1440
+                    }
+                },
+                {
+                    "caption": "Max Punkte",
+                    "name": "TrackMaxPoints",
+                    "width": "140px",
+                    "add": 200,
+                    "edit": {
+                        "type": "NumberSpinner",
+                        "minimum": 20,
+                        "maximum": 500
+                    }
+                },
+                {
+                    "caption": "Zoom berücksichtigen",
+                    "name": "IncludeInZoom",
+                    "width": "160px",
+                    "add": true,
+                    "edit": {
+                        "type": "CheckBox"
+                    }
                 }
             ]
         },
@@ -225,6 +265,15 @@
                                 "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/leisure/golf_pin.svg"
                             }
                         ]
+                    }
+                },
+                {
+                    "caption": "Zoom berücksichtigen",
+                    "name": "IncludeInZoom",
+                    "width": "160px",
+                    "add": true,
+                    "edit": {
+                        "type": "CheckBox"
                     }
                 }
             ]

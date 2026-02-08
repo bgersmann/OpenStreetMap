@@ -17,6 +17,7 @@ Diese Modul stellt verschiedene Erweiterungen bereit, um die Arbeit mit Symcon z
 - Nutzt das Symcon Location Control, um die Hausposition auszulesen und als eigenen Marker darzustellen.
 - Bindet beliebige Punkte auf der Karte ein, deren Koordinaten aus Variablen (Latitude/Longitude) stammen.
 - Aktualisiert Beschriftungen und Markeranzahl in einer Info-Karte innerhalb der Visualisierung.
+- Zeichnet auf Wunsch einen Verlaufs-Trail für einzelne Punkte und nutzt dafür die archivierten Koordinatenwerte.
 
 ### 2. Voraussetzungen
 
@@ -40,6 +41,17 @@ Location Control | Auswahl der Kern-Instanz *Location* (Kern Instanzen -> Locati
 Zoomstufe | Optionaler Standard-Zoom für die Kartenansicht, falls das Location Control keinen Kartenmaßstab vorgibt.
 Markierungen | Liste von Punkten. Jeder Eintrag besitzt einen Namen sowie zwei Variablen-IDs für Latitude und Longitude.
 
+Zusätzliche Optionen innerhalb der Markierungsliste:
+
+- **Verlauf aktiv**: Aktiviert die Berechnung eines Trails für diesen Punkt.
+- **Dauer (Minuten)**: Bestimmt, wie weit in die Vergangenheit Koordinaten aus dem Archiv berücksichtigt werden (5–1440 Minuten).
+- **Max Punkte**: Begrenzt die Anzahl der Linienpunkte zur Schonung von Browser und Netzwerk.
+- **Zoom berücksichtigen**: Steuert, ob der Marker (inklusive Trail) bei der automatischen Kartenausrichtung mit einbezogen wird.
+
+> Voraussetzung für den Verlauf: Beide Positions-Variablen müssen vom Archive Control geloggt werden.
+
+Die Checkbox **Zoom berücksichtigen** ist zusätzlich in der Liste der festen Punkte vorhanden.
+
 > Hinweis: Ist kein Location Control verknüpft, nutzt das Modul weiterhin die zuvor gespeicherten Koordinaten aus der alten `HouseLocation`-Eigenschaft als Fallback.
 
 ### 5. Statusvariablen und Profile
@@ -52,7 +64,7 @@ Dieses Modul legt keine Statusvariablen und keine eigenen Profile an.
 
 ### 6. Visualisierung
 
-Die Visualisierung zeigt die OpenStreetMap-Karte mit einem hervorgehobenen Haus-Marker sowie allen konfigurierten Punkten. Ein Info-Panel blendet die Hausbezeichnung und die Anzahl der Marker ein.
+Die Visualisierung zeigt die OpenStreetMap-Karte mit einem hervorgehobenen Haus-Marker sowie allen konfigurierten Punkten. Ein Info-Panel blendet die Hausbezeichnung und die Anzahl der Marker ein. Aktivierte Verläufe erscheinen als halbtransparente Polylinien, die die zuletzt archivierten Positionen verbinden.
 
 ### 7. PHP-Befehlsreferenz
 
