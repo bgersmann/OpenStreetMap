@@ -43,7 +43,7 @@
         #map {
             flex: 1;
             width: 100%;
-            border-radius: 22px;
+            border-radius: 0px;
             box-shadow: 0 20px 45px rgba(0, 0, 0, 0.4);
             overflow: hidden;
         }
@@ -80,7 +80,7 @@
             let houseMarker = null;
             const pointLayer = L.layerGroup();
             const trailLayer = L.layerGroup();
-            const defaultTrailColors = ['#ff6b35', '#ffd166', '#06d6a0', '#118ab2', '#9b5de5', '#ef476f'];
+            const defaultTrailColor = '#2f2f2f';
             const defaults = {
                 latitude: 51.1657,
                 longitude: 15.4515,
@@ -212,7 +212,7 @@
                     return point.trailColor.trim();
                 }
 
-                return defaultTrailColors[index % defaultTrailColors.length];
+                return defaultTrailColor;
             }
 
             function shouldIncludeInZoom(point) {
