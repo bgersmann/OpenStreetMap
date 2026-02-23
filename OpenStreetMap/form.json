@@ -46,7 +46,7 @@
                     "caption": "Latitude Variable",
                     "name": "LatitudeID",
                     "width": "200px",
-                    "add": 0,
+                    "add": 1,
                     "edit": {
                         "type": "SelectObject",
                         "objectType": 2
@@ -56,7 +56,7 @@
                     "caption": "Longitude Variable",
                     "name": "LongitudeID",
                     "width": "200px",
-                    "add": 0,
+                    "add": 1,
                     "edit": {
                         "type": "SelectObject",
                         "objectType": 2
@@ -128,6 +128,16 @@
                     "add": false,
                     "edit": {
                         "type": "CheckBox"
+                    }
+                },
+                {
+                    "caption": "Track (String Variable)",
+                    "name": "TrackVariableID",
+                    "width": "220px",
+                    "add": 1,
+                    "edit": {
+                        "type": "SelectObject",
+                        "objectType": 2
                     }
                 },
                 {

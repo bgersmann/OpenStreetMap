@@ -233,31 +233,46 @@ class OpenStreetMap extends IPSModule
         foreach ($points as $index => $point) {
             $latID = (int)($point['LatitudeID'] ?? 0);
             $lonID = (int)($point['LongitudeID'] ?? 0);
-            if ($latID <= 0 || $lonID <= 0) {
-                continue;
-            }
-            if (!IPS_VariableExists($latID) || !IPS_VariableExists($lonID)) {
-                $this->SendDebug(__FUNCTION__, sprintf('Variable missing for point %d', $index), 0);
-                continue;
-            }
+            $latitude = null;
+            $longitude = null;
 
-            $latitude = GetValue($latID);
-            $longitude = GetValue($lonID);
-            if (!is_numeric($latitude) || !is_numeric($longitude)) {
-                $this->SendDebug(__FUNCTION__, sprintf('Non numeric values for point %d', $index), 0);
-                continue;
+            if ($latID > 0 && $lonID > 0) {
+                if (!IPS_VariableExists($latID) || !IPS_VariableExists($lonID)) {
+                    $this->SendDebug(__FUNCTION__, sprintf('Variable missing for point %d', $index), 0);
+                } else {
+                    $latitudeValue = GetValue($latID);
+                    $longitudeValue = GetValue($lonID);
+                    if (!is_numeric($latitudeValue) || !is_numeric($longitudeValue)) {
+                        $this->SendDebug(__FUNCTION__, sprintf('Non numeric values for point %d', $index), 0);
+                    } else {
+                        $latitude = (float)$latitudeValue;
+                        $longitude = (float)$longitudeValue;
+                    }
+                }
             }
 
             $name = trim((string)($point['Name'] ?? ''));
             if ($name === '') {
-                $name = IPS_GetName($latID);
+                if ($latID > 0 && IPS_VariableExists($latID)) {
+                    $name = IPS_GetName($latID);
+                } else {
+                    $name = sprintf('Punkt %d', $index + 1);
+                }
             }
 
             $icon = $this->NormalizeIconUrl($point['Icon'] ?? '');
 
             $trailCoordinates = [];
-            $trailEnabled = (bool)($point['TrackEnabled'] ?? false);
-            if ($trailEnabled) {
+            $trackVariableID = (int)($point['TrackVariableID'] ?? 0);
+            $trailRequested = (bool)($point['TrackEnabled'] ?? false) || $trackVariableID > 0;
+            if ($trackVariableID > 0) {
+                if (!IPS_VariableExists($trackVariableID)) {
+                    $this->SendDebug(__FUNCTION__, sprintf('Track variable %d missing for point %d', $trackVariableID, $index), 0);
+                } else {
+                    $trailMaxPoints = $this->NormalizeTrailMaxPoints($point['TrackMaxPoints'] ?? null);
+                    $trailCoordinates = $this->BuildTrailCoordinatesFromVariable($trackVariableID, $trailMaxPoints);
+                }
+            } elseif ($trailRequested) {
                 if (!$archiveLookupDone) {
                     $archiveID = $this->GetArchiveControlID();
                     $archiveLookupDone = true;
@@ -275,10 +290,21 @@ class OpenStreetMap extends IPSModule
                 }
             }
 
+            if (($latitude === null || $longitude === null) && $trailCoordinates !== []) {
+                $lastTrailPoint = $trailCoordinates[count($trailCoordinates) - 1];
+                $latitude = (float)$lastTrailPoint['latitude'];
+                $longitude = (float)$lastTrailPoint['longitude'];
+            }
+
+            if ($latitude === null || $longitude === null) {
+                $this->SendDebug(__FUNCTION__, sprintf('Skipping point %d because no coordinates are available', $index), 0);
+                continue;
+            }
+
             $result[] = [
                 'name' => $name,
-                'latitude' => (float)$latitude,
-                'longitude' => (float)$longitude,
+                'latitude' => $latitude,
+                'longitude' => $longitude,
                 'icon' => $icon,
                 'trail' => $trailCoordinates,
                 'includeInZoom' => array_key_exists('IncludeInZoom', $point) ? (bool)$point['IncludeInZoom'] : true
@@ -405,6 +431,11 @@ class OpenStreetMap extends IPSModule
                     $ids[$id] = true;
                 }
             }
+
+            $trackVariableID = (int)($point['TrackVariableID'] ?? 0);
+            if ($trackVariableID > 0) {
+                $ids[$trackVariableID] = true;
+            }
         }
 
         return array_keys($ids);
@@ -485,6 +516,92 @@ class OpenStreetMap extends IPSModule
         }
 
         return $this->LimitTrailPoints($trail, $maxPoints);
+    }
+
+    /**
+     * Builds a trail from a JSON encoded string variable.
+     */
+    private function BuildTrailCoordinatesFromVariable(int $variableID, int $maxPoints): array
+    {
+        if (!IPS_VariableExists($variableID)) {
+            return [];
+        }
+
+        $rawValue = GetValue($variableID);
+        if (is_string($rawValue)) {
+            $rawValue = trim($rawValue);
+        }
+
+        if ($rawValue === '' || $rawValue === null) {
+            return [];
+        }
+
+        if (is_array($rawValue)) {
+            $decoded = $rawValue;
+        } else {
+            $decoded = json_decode((string)$rawValue, true);
+            if (!is_array($decoded)) {
+                $this->SendDebug(__FUNCTION__, sprintf('Invalid track payload in variable %d', $variableID), 0);
+                return [];
+            }
+        }
+
+        $trail = [];
+        foreach ($decoded as $index => $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $latitude = $this->ExtractCoordinateFromTrackEntry($entry, ['latitude', 'lat', 'y']);
+            $longitude = $this->ExtractCoordinateFromTrackEntry($entry, ['longitude', 'lon', 'lng', 'x']);
+            if ($latitude === null || $longitude === null) {
+                continue;
+            }
+
+            $timeCandidate = $entry['timestamp'] ?? $entry['time'] ?? $entry['date'] ?? null;
+            $trail[] = [
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+                'timestamp' => $this->NormalizeTrackTimestamp($timeCandidate, $index)
+            ];
+        }
+
+        if (count($trail) <= 1) {
+            return [];
+        }
+
+        $limit = $this->NormalizeTrailMaxPoints($maxPoints);
+        return $this->LimitTrailPoints($trail, $limit);
+    }
+
+    private function ExtractCoordinateFromTrackEntry(array $entry, array $candidates): ?float
+    {
+        foreach ($candidates as $candidate) {
+            if (array_key_exists($candidate, $entry)) {
+                return $this->NormalizeCoordinate($entry[$candidate]);
+            }
+        }
+
+        return null;
+    }
+
+    private function NormalizeTrackTimestamp($value, int $fallback): int
+    {
+        if (is_numeric($value)) {
+            return (int)$value;
+        }
+
+        if (is_string($value)) {
+            $trimmed = trim($value);
+            if ($trimmed !== '') {
+                $parsed = strtotime($trimmed);
+                if ($parsed !== false) {
+                    return $parsed;
+                }
+            }
+        }
+
+        return $fallback;
     }
 
     private function ResolveLongitudeValue(array $lonByTimestamp, int $timestamp, int $toleranceSeconds): ?float
