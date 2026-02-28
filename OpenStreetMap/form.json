@@ -18,6 +18,13 @@
             "maximum": 20
         },
         {
+            "name": "GlobalTrailMaxPoints",
+            "type": "NumberSpinner",
+            "caption": "Verlauf Max Punkte (global)",
+            "minimum": 20,
+            "maximum": 1000
+        },
+        {
             "type": "Label",
             "caption": "Punkte auf der Karte"
         },
@@ -122,10 +129,62 @@
                     }
                 },
                 {
-                    "caption": "Verlauf aktiv",
-                    "name": "TrackEnabled",
-                    "width": "120px",
-                    "add": false,
+                    "caption": "Zoom berücksichtigen",
+                    "name": "IncludeInZoom",
+                    "width": "160px",
+                    "add": true,
+                    "edit": {
+                        "type": "CheckBox"
+                    }
+                },
+                {
+                    "caption": "Verlauf anzeigen",
+                    "name": "ShowTrail",
+                    "width": "130px",
+                    "add": true,
+                    "edit": {
+                        "type": "CheckBox"
+                    }
+                },
+                {
+                    "caption": "Verlauf Minuten",
+                    "name": "TrailMinutes",
+                    "width": "130px",
+                    "add": 60,
+                    "edit": {
+                        "type": "NumberSpinner",
+                        "minimum": 5,
+                        "maximum": 1440
+                    }
+                }
+            ]
+        },
+        {
+            "type": "Label",
+            "caption": "Verläufe (Tracks)"
+        },
+        {
+            "name": "Tracks",
+            "type": "List",
+            "caption": "Track-Konfiguration",
+            "rowCount": 4,
+            "add": true,
+            "delete": true,
+            "columns": [
+                {
+                    "caption": "Trackname",
+                    "name": "Name",
+                    "width": "220px",
+                    "add": "",
+                    "edit": {
+                        "type": "ValidationTextBox"
+                    }
+                },
+                {
+                    "caption": "Archiv Verlauf aktiv",
+                    "name": "ArchiveEnabled",
+                    "width": "140px",
+                    "add": true,
                     "edit": {
                         "type": "CheckBox"
                     }
@@ -141,17 +200,6 @@
                     }
                 },
                 {
-                    "caption": "Dauer (Minuten)",
-                    "name": "TrackMinutes",
-                    "width": "140px",
-                    "add": 60,
-                    "edit": {
-                        "type": "NumberSpinner",
-                        "minimum": 5,
-                        "maximum": 1440
-                    }
-                },
-                {
                     "caption": "Max Punkte",
                     "name": "TrackMaxPoints",
                     "width": "140px",
@@ -159,16 +207,7 @@
                     "edit": {
                         "type": "NumberSpinner",
                         "minimum": 20,
-                        "maximum": 500
-                    }
-                },
-                {
-                    "caption": "Zoom berücksichtigen",
-                    "name": "IncludeInZoom",
-                    "width": "160px",
-                    "add": true,
-                    "edit": {
-                        "type": "CheckBox"
+                        "maximum": 1000
                     }
                 }
             ]

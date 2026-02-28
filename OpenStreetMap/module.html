@@ -48,6 +48,37 @@
             overflow: hidden;
         }
 
+        #historyControls {
+            position: absolute;
+            bottom: 14px;
+            left: 14px;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            background: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+            backdrop-filter: blur(2px);
+            max-width: calc(100% - 28px);
+        }
+
+        #historyControls.hidden {
+            display: none;
+        }
+
+        #historyPointSelect {
+            min-width: 140px;
+            max-width: 260px;
+        }
+
+        #historyStatus {
+            color: var(--muted);
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
         .leaflet-container {
             font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
         }
@@ -67,6 +98,12 @@
 <body>
     <div id="app">
         <div id="map"></div>
+        <div id="historyControls" class="hidden">
+            <select id="historyPointSelect"></select>
+            <button type="button" id="historyPrev">◀</button>
+            <button type="button" id="historyNext">▶</button>
+            <span id="historyStatus">0 / 0</span>
+        </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
@@ -80,12 +117,25 @@
             let houseMarker = null;
             const pointLayer = L.layerGroup();
             const trailLayer = L.layerGroup();
+            let historyRoundLayer = null;
             const defaultTrailColor = '#2f2f2f';
             const defaults = {
                 latitude: 51.1657,
                 longitude: 15.4515,
                 zoom: 6,
                 label: 'Haus'
+            };
+            const historyState = {
+                tracks: [],
+                selectedTrack: 0,
+                selectedRound: 0
+            };
+            const historyControls = {
+                container: null,
+                select: null,
+                prevButton: null,
+                nextButton: null,
+                status: null
             };
 
             function parsePayload(data) {
@@ -182,19 +232,150 @@
                     marker.addTo(pointLayer);
                     const popupHtml = `<strong>${label}</strong><br>Lat: ${point.latitude.toFixed(5)}<br>Lon: ${point.longitude.toFixed(5)}`;
                     marker.bindPopup(popupHtml);
-
-                    const trailLatLngs = getTrailLatLngs(point);
-                    if (trailLatLngs.length > 1) {
-                        L.polyline(trailLatLngs, {
-                            color: resolveTrailColor(point, index),
-                            weight: 3,
-                            opacity: 0.65,
-                            lineJoin: 'round',
-                            lineCap: 'round'
-                        }).addTo(trailLayer);
-                    }
                 });
 
+                updateHistoryTracks(validPoints);
+            }
+
+            function ensureHistoryControls() {
+                if (historyControls.container) {
+                    return;
+                }
+
+                historyControls.container = document.getElementById('historyControls');
+                historyControls.select = document.getElementById('historyPointSelect');
+                historyControls.prevButton = document.getElementById('historyPrev');
+                historyControls.nextButton = document.getElementById('historyNext');
+                historyControls.status = document.getElementById('historyStatus');
+
+                historyControls.select.addEventListener('change', () => {
+                    historyState.selectedTrack = historyControls.select.selectedIndex;
+                    const selectedRounds = getSelectedRounds();
+                    historyState.selectedRound = selectedRounds.length > 0 ? selectedRounds.length - 1 : 0;
+                    renderHistorySelection();
+                });
+
+                historyControls.prevButton.addEventListener('click', () => {
+                    const selectedRounds = getSelectedRounds();
+                    if (selectedRounds.length <= 1) {
+                        return;
+                    }
+
+                    historyState.selectedRound = Math.max(0, historyState.selectedRound - 1);
+                    renderHistorySelection();
+                });
+
+                historyControls.nextButton.addEventListener('click', () => {
+                    const selectedRounds = getSelectedRounds();
+                    if (selectedRounds.length <= 1) {
+                        return;
+                    }
+
+                    historyState.selectedRound = Math.min(selectedRounds.length - 1, historyState.selectedRound + 1);
+                    renderHistorySelection();
+                });
+            }
+
+            function updateHistoryTracks(points) {
+                ensureHistoryControls();
+
+                historyState.tracks = points
+                    .map((point) => ({
+                        name: point.name || 'Unbenannter Verlauf',
+                        rounds: getTrailRounds(point)
+                    }))
+                    .filter((entry) => entry.rounds.length > 0);
+
+                historyControls.select.innerHTML = '';
+                historyState.tracks.forEach((entry, index) => {
+                    const option = document.createElement('option');
+                    option.value = String(index);
+                    option.textContent = entry.name;
+                    historyControls.select.appendChild(option);
+                });
+
+                if (historyState.tracks.length === 0) {
+                    historyControls.container.classList.add('hidden');
+                    if (historyRoundLayer) {
+                        historyRoundLayer.remove();
+                        historyRoundLayer = null;
+                    }
+                    return;
+                }
+
+                historyControls.container.classList.remove('hidden');
+                historyState.selectedTrack = Math.min(historyState.selectedTrack, historyState.tracks.length - 1);
+                historyControls.select.selectedIndex = historyState.selectedTrack;
+
+                const selectedRounds = getSelectedRounds();
+                historyState.selectedRound = Math.min(historyState.selectedRound, selectedRounds.length - 1);
+                if (historyState.selectedRound < 0) {
+                    historyState.selectedRound = 0;
+                }
+
+                renderHistorySelection();
+            }
+
+            function getSelectedRounds() {
+                const selected = historyState.tracks[historyState.selectedTrack];
+                return selected && Array.isArray(selected.rounds) ? selected.rounds : [];
+            }
+
+            function renderHistorySelection() {
+                const selected = historyState.tracks[historyState.selectedTrack];
+                if (!selected) {
+                    return;
+                }
+
+                const rounds = selected.rounds;
+                if (rounds.length === 0) {
+                    return;
+                }
+
+                const roundIndex = Math.min(Math.max(historyState.selectedRound, 0), rounds.length - 1);
+                historyState.selectedRound = roundIndex;
+
+                const round = rounds[roundIndex];
+                const timestampText = formatTimestamp(round.timestamp);
+                const distanceKm = calculateRoundDistanceKm(round.coords);
+                historyControls.status.textContent = `Runde ${roundIndex + 1} / ${rounds.length}${timestampText ? ' · ' + timestampText : ''}${distanceKm !== null ? ` · ${distanceKm.toFixed(2)} km` : ''}`;
+
+                if (!mapInstance) {
+                    return;
+                }
+
+                if (historyRoundLayer) {
+                    historyRoundLayer.remove();
+                }
+
+                historyRoundLayer = L.polyline(round.coords, {
+                    color: '#ffb347',
+                    weight: 4,
+                    opacity: 0.9,
+                    lineJoin: 'round',
+                    lineCap: 'round'
+                }).addTo(mapInstance);
+
+                const roundBounds = L.latLngBounds(round.coords);
+                mapInstance.fitBounds(roundBounds.pad(0.12), {
+                    animate: true,
+                    maxZoom: 18
+                });
+
+                historyRoundLayer.bindPopup(`<strong>${selected.name}</strong><br>Runde ${roundIndex + 1} / ${rounds.length}${timestampText ? '<br>' + timestampText : ''}${distanceKm !== null ? `<br>Distanz: ${distanceKm.toFixed(2)} km` : ''}`);
+            }
+
+            function formatTimestamp(timestamp) {
+                if (typeof timestamp !== 'number' || timestamp <= 0) {
+                    return '';
+                }
+
+                const date = new Date(timestamp * 1000);
+                if (Number.isNaN(date.getTime())) {
+                    return '';
+                }
+
+                return date.toLocaleString('de-DE');
             }
 
             function getTrailLatLngs(point) {
@@ -205,6 +386,84 @@
                 return point.trail
                     .filter((segment) => typeof segment.latitude === 'number' && typeof segment.longitude === 'number')
                     .map((segment) => [segment.latitude, segment.longitude]);
+            }
+
+            function getTrailRounds(point) {
+                if (!point) {
+                    return [];
+                }
+
+                let rounds = [];
+                if (Array.isArray(point.trailRounds) && point.trailRounds.length > 0) {
+                    rounds = point.trailRounds;
+                } else {
+                    const fallbackTrail = getTrailLatLngs(point);
+                    if (fallbackTrail.length > 1) {
+                        rounds = [point.trail];
+                    }
+                }
+
+                return rounds
+                    .map((round) => {
+                        if (!Array.isArray(round)) {
+                            return null;
+                        }
+
+                        const validSegments = round
+                            .filter((segment) => typeof segment.latitude === 'number' && typeof segment.longitude === 'number');
+                        if (validSegments.length < 2) {
+                            return null;
+                        }
+
+                        const timestampValue = validSegments[0].timestamp ?? validSegments[validSegments.length - 1].timestamp ?? null;
+                        return {
+                            coords: validSegments.map((segment) => [segment.latitude, segment.longitude]),
+                            timestamp: (typeof timestampValue === 'number') ? timestampValue : null
+                        };
+                    })
+                    .filter((round) => round !== null);
+            }
+
+            function getSelectedRound() {
+                const rounds = getSelectedRounds();
+                if (rounds.length === 0) {
+                    return null;
+                }
+
+                const roundIndex = Math.min(Math.max(historyState.selectedRound, 0), rounds.length - 1);
+                return rounds[roundIndex];
+            }
+
+            function calculateRoundDistanceKm(coords) {
+                if (!Array.isArray(coords) || coords.length < 2) {
+                    return null;
+                }
+
+                let distance = 0;
+                for (let i = 1; i < coords.length; i++) {
+                    distance += haversineDistanceKm(coords[i - 1], coords[i]);
+                }
+
+                return distance;
+            }
+
+            function haversineDistanceKm(from, to) {
+                const radius = 6371;
+                const lat1 = toRadians(from[0]);
+                const lon1 = toRadians(from[1]);
+                const lat2 = toRadians(to[0]);
+                const lon2 = toRadians(to[1]);
+                const dLat = lat2 - lat1;
+                const dLon = lon2 - lon1;
+
+                const a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                    + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                return radius * c;
+            }
+
+            function toRadians(degrees) {
+                return degrees * (Math.PI / 180);
             }
 
             function resolveTrailColor(point, index) {
@@ -240,14 +499,13 @@
                         if (typeof point.latitude === 'number' && typeof point.longitude === 'number') {
                             latLngs.push([point.latitude, point.longitude]);
                         }
+                    });
+                }
 
-                        if (Array.isArray(point.trail)) {
-                            point.trail.forEach((segment) => {
-                                if (typeof segment.latitude === 'number' && typeof segment.longitude === 'number') {
-                                    latLngs.push([segment.latitude, segment.longitude]);
-                                }
-                            });
-                        }
+                const selectedRound = getSelectedRound();
+                if (selectedRound) {
+                    selectedRound.coords.forEach((coord) => {
+                        latLngs.push(coord);
                     });
                 }
 
