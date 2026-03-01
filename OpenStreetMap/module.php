@@ -297,6 +297,7 @@ class OpenStreetMap extends IPSModule
     private function GetAllPoints(): array
     {
         $configuredPoints = $this->ApplyConfiguredTracks($this->GetConfiguredPoints());
+        $configuredPoints = $this->ApplyPointVariableTrails($configuredPoints);
         $preparedConfigured = [];
 
         foreach ($configuredPoints as $point) {
@@ -539,6 +540,53 @@ class OpenStreetMap extends IPSModule
                 $configuredPoints[$pointIndex]['trail'] = $trailRounds[count($trailRounds) - 1];
             }
         }
+
+        return $configuredPoints;
+    }
+
+    private function ApplyPointVariableTrails(array $configuredPoints): array
+    {
+        if ($configuredPoints === []) {
+            return $configuredPoints;
+        }
+
+        $archiveID = $this->GetArchiveControlID();
+        if ($archiveID === null) {
+            return $configuredPoints;
+        }
+
+        $maxPoints = $this->ResolveTrailMaxPoints(null);
+
+        foreach ($configuredPoints as &$point) {
+            if (!(bool)($point['showTrail'] ?? true)) {
+                continue;
+            }
+
+            $existingTrail = $point['trail'] ?? [];
+            if (is_array($existingTrail) && $existingTrail !== []) {
+                continue;
+            }
+
+            $latitudeID = (int)($point['__latitudeID'] ?? 0);
+            $longitudeID = (int)($point['__longitudeID'] ?? 0);
+
+            if ($latitudeID <= 0 || $longitudeID <= 0) {
+                continue;
+            }
+
+            if (!IPS_VariableExists($latitudeID) || !IPS_VariableExists($longitudeID)) {
+                continue;
+            }
+
+            $trailMinutes = $this->NormalizeTrailMinutes($point['trailMinutes'] ?? null);
+            $trail = $this->BuildPointTrailFromArchive($archiveID, $latitudeID, $longitudeID, $trailMinutes, $maxPoints);
+
+            if ($trail !== []) {
+                $point['trail'] = $trail;
+            }
+        }
+
+        unset($point);
 
         return $configuredPoints;
     }
@@ -800,6 +848,104 @@ class OpenStreetMap extends IPSModule
         }
 
         return array_values($rounds);
+    }
+
+    private function BuildPointTrailFromArchive(int $archiveID, int $latitudeID, int $longitudeID, int $durationMinutes, int $maxPoints): array
+    {
+        if (!function_exists('AC_GetLoggedValues')) {
+            return [];
+        }
+
+        $endTime = time();
+        $startTime = $endTime - ($durationMinutes * 60);
+
+        try {
+            $latitudeEntries = AC_GetLoggedValues($archiveID, $latitudeID, $startTime, $endTime, 0);
+            $longitudeEntries = AC_GetLoggedValues($archiveID, $longitudeID, $startTime, $endTime, 0);
+        } catch (\Throwable $exception) {
+            $this->SendDebug(__FUNCTION__, sprintf('Archive query failed: %s', $exception->getMessage()), 0);
+            return [];
+        }
+
+        $latitudeLog = $this->PrepareCoordinateLog($latitudeEntries);
+        $longitudeLog = $this->PrepareCoordinateLog($longitudeEntries);
+
+        $trail = $this->PairCoordinateLogs($latitudeLog, $longitudeLog);
+        if (count($trail) <= 1) {
+            return [];
+        }
+
+        return $this->LimitTrailPoints($trail, $maxPoints);
+    }
+
+    private function PrepareCoordinateLog(array $entries): array
+    {
+        if ($entries === []) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($entries as $entry) {
+            if (!isset($entry['TimeStamp']) || !isset($entry['Value'])) {
+                continue;
+            }
+
+            $coordinate = $this->NormalizeCoordinate($entry['Value']);
+            if ($coordinate === null) {
+                continue;
+            }
+
+            $timestamp = (int)$entry['TimeStamp'];
+            $result[$timestamp] = $coordinate;
+        }
+
+        if ($result === []) {
+            return [];
+        }
+
+        ksort($result);
+
+        return $result;
+    }
+
+    private function PairCoordinateLogs(array $latitudeLog, array $longitudeLog): array
+    {
+        if ($latitudeLog === [] || $longitudeLog === []) {
+            return [];
+        }
+
+        $latitudeTimes = array_keys($latitudeLog);
+        $longitudeTimes = array_keys($longitudeLog);
+        $latCount = count($latitudeTimes);
+        $lonCount = count($longitudeTimes);
+        $i = 0;
+        $j = 0;
+        $paired = [];
+
+        while ($i < $latCount && $j < $lonCount) {
+            $latTimestamp = $latitudeTimes[$i];
+            $lonTimestamp = $longitudeTimes[$j];
+            $difference = $latTimestamp - $lonTimestamp;
+
+            if (abs($difference) <= 5) {
+                $paired[] = [
+                    'latitude' => $latitudeLog[$latTimestamp],
+                    'longitude' => $longitudeLog[$lonTimestamp],
+                    'timestamp' => max($latTimestamp, $lonTimestamp)
+                ];
+                $i++;
+                $j++;
+                continue;
+            }
+
+            if ($difference < 0) {
+                $i++;
+            } else {
+                $j++;
+            }
+        }
+
+        return $paired;
     }
 
     private function BuildTrackRoundFromVariable(int $variableID, int $maxPoints): array
