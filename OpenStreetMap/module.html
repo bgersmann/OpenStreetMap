@@ -232,6 +232,17 @@
                     marker.addTo(pointLayer);
                     const popupHtml = `<strong>${label}</strong><br>Lat: ${point.latitude.toFixed(5)}<br>Lon: ${point.longitude.toFixed(5)}`;
                     marker.bindPopup(popupHtml);
+
+                    const trailCoords = getTrailLatLngs(point);
+                    if (trailCoords.length > 1) {
+                        L.polyline(trailCoords, {
+                            color: resolveTrailColor(point, index),
+                            weight: 3,
+                            opacity: 0.7,
+                            lineJoin: 'round',
+                            lineCap: 'round'
+                        }).addTo(trailLayer);
+                    }
                 });
 
                 updateHistoryTracks(validPoints);
