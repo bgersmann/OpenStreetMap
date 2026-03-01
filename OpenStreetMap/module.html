@@ -291,6 +291,7 @@
                 ensureHistoryControls();
 
                 historyState.tracks = points
+                    .filter((point) => point && point.historyEligible)
                     .map((point) => ({
                         name: point.name || 'Unbenannter Verlauf',
                         rounds: getTrailRounds(point)

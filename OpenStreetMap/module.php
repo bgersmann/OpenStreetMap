@@ -296,8 +296,7 @@ class OpenStreetMap extends IPSModule
 
     private function GetAllPoints(): array
     {
-        $configuredPoints = $this->ApplyConfiguredTracks($this->GetConfiguredPoints());
-        $configuredPoints = $this->ApplyPointVariableTrails($configuredPoints);
+        $configuredPoints = $this->ApplyPointVariableTrails($this->GetConfiguredPoints());
         $preparedConfigured = [];
 
         foreach ($configuredPoints as $point) {
@@ -321,7 +320,9 @@ class OpenStreetMap extends IPSModule
                 'latitude' => (float)$latitude,
                 'longitude' => (float)$longitude,
                 'icon' => $point['icon'],
-                'includeInZoom' => (bool)$point['includeInZoom']
+                'includeInZoom' => (bool)$point['includeInZoom'],
+                'type' => 'point',
+                'historyEligible' => false
             ];
 
             if ($trailCoordinates !== []) {
@@ -335,24 +336,16 @@ class OpenStreetMap extends IPSModule
             $preparedConfigured[] = $entry;
         }
 
-        $standaloneTracks = $this->GetStandaloneTrackPoints($configuredPoints);
+        $standaloneTracks = $this->GetStandaloneTrackPoints();
 
         return array_merge($this->GetFixedPoints(), $preparedConfigured, $standaloneTracks);
     }
 
-    private function GetStandaloneTrackPoints(array $configuredPoints): array
+    private function GetStandaloneTrackPoints(): array
     {
         $tracks = $this->GetTrackConfigurations();
         if ($tracks === []) {
             return [];
-        }
-
-        $nameKeysOfConfiguredPoints = [];
-        foreach ($configuredPoints as $point) {
-            $nameKey = (string)($point['__nameKey'] ?? '');
-            if ($nameKey !== '') {
-                $nameKeysOfConfiguredPoints[$nameKey] = true;
-            }
         }
 
         $archiveID = null;
@@ -366,11 +359,6 @@ class OpenStreetMap extends IPSModule
             }
 
             $trackName = $this->ResolveTrackDisplayName($track, $trackIndex);
-            $pointNameKey = $this->NormalizePointName(trim((string)($track['PointName'] ?? '')));
-
-            if ($pointNameKey !== '' && array_key_exists($pointNameKey, $nameKeysOfConfiguredPoints)) {
-                continue;
-            }
 
             $trackVariableID = (int)($track['TrackVariableID'] ?? 0);
             if ($trackVariableID <= 0) {
@@ -423,7 +411,9 @@ class OpenStreetMap extends IPSModule
                 'icon' => null,
                 'includeInZoom' => true,
                 'trail' => $latestRound,
-                'trailRounds' => $trailRounds
+                'trailRounds' => $trailRounds,
+                'type' => 'track',
+                'historyEligible' => true
             ];
 
             $result[] = $entry;
@@ -432,117 +422,6 @@ class OpenStreetMap extends IPSModule
         return $result;
     }
 
-    private function ApplyConfiguredTracks(array $configuredPoints): array
-    {
-        if ($configuredPoints === []) {
-            return $configuredPoints;
-        }
-
-        $tracks = $this->GetTrackConfigurations();
-        if ($tracks === []) {
-            return $configuredPoints;
-        }
-
-        $indexByName = [];
-        foreach ($configuredPoints as $index => $point) {
-            $nameKey = (string)($point['__nameKey'] ?? '');
-            if ($nameKey === '' || array_key_exists($nameKey, $indexByName)) {
-                continue;
-            }
-            $indexByName[$nameKey] = $index;
-        }
-
-        $archiveID = null;
-        $archiveLookupDone = false;
-        $archiveWarningIssued = false;
-
-        foreach ($tracks as $trackIndex => $track) {
-            if (!is_array($track)) {
-                continue;
-            }
-
-            $pointName = trim((string)($track['PointName'] ?? ''));
-            $pointIndex = null;
-
-            if ($pointName !== '') {
-                $pointNameKey = $this->NormalizePointName($pointName);
-                if (array_key_exists($pointNameKey, $indexByName)) {
-                    $pointIndex = $indexByName[$pointNameKey];
-                } elseif (count($configuredPoints) === 1) {
-                    $pointIndex = array_key_first($configuredPoints);
-                    $this->SendDebug(__FUNCTION__, sprintf('Track target "%s" does not match exactly, fallback to the only point "%s"', $pointName, (string)$configuredPoints[$pointIndex]['name']), 0);
-                } else {
-                    $showTrailCandidates = [];
-                    foreach ($configuredPoints as $candidateIndex => $candidatePoint) {
-                        if ((bool)($candidatePoint['showTrail'] ?? true)) {
-                            $showTrailCandidates[] = $candidateIndex;
-                        }
-                    }
-
-                    if (count($showTrailCandidates) === 1) {
-                        $pointIndex = $showTrailCandidates[0];
-                        $this->SendDebug(__FUNCTION__, sprintf('Track target "%s" fallback to single trail-enabled point "%s"', $pointName, (string)$configuredPoints[$pointIndex]['name']), 0);
-                    } else {
-                        $this->SendDebug(__FUNCTION__, sprintf('Track target "%s" does not match any configured point', $pointName), 0);
-                        continue;
-                    }
-                }
-            } else {
-                continue;
-            }
-
-            if (!(bool)($configuredPoints[$pointIndex]['showTrail'] ?? true)) {
-                continue;
-            }
-
-            $trackVariableID = (int)($track['TrackVariableID'] ?? 0);
-            $trailRounds = [];
-            $trailMaxPoints = $this->ResolveTrailMaxPoints($track['TrackMaxPoints'] ?? null);
-
-            if ($trackVariableID > 0) {
-                if (!IPS_VariableExists($trackVariableID)) {
-                    $this->SendDebug(__FUNCTION__, sprintf('Track variable %d missing for point "%s"', $trackVariableID, $pointName), 0);
-                } else {
-                    if ((bool)($track['ArchiveEnabled'] ?? true)) {
-                        if (!$archiveLookupDone) {
-                            $archiveID = $this->GetArchiveControlID();
-                            $archiveLookupDone = true;
-                        }
-
-                        if ($archiveID === null) {
-                            if (!$archiveWarningIssued) {
-                                $this->SendDebug(__FUNCTION__, 'Archive Control instance missing. Trails cannot be generated.', 0);
-                                $archiveWarningIssued = true;
-                            }
-                            continue;
-                        }
-
-                        $trailMinutes = $this->NormalizeTrailMinutes($configuredPoints[$pointIndex]['trailMinutes'] ?? self::DEFAULT_TRAIL_MINUTES);
-                        $trailRounds = $this->BuildTrailRoundsFromArchive($archiveID, $trackVariableID, $trailMinutes, $trailMaxPoints);
-
-                        if ($trailRounds === []) {
-                            $singleRound = $this->BuildTrackRoundFromVariable($trackVariableID, $trailMaxPoints);
-                            if ($singleRound !== []) {
-                                $trailRounds = [$singleRound];
-                            }
-                        }
-                    } else {
-                        $singleRound = $this->BuildTrackRoundFromVariable($trackVariableID, $trailMaxPoints);
-                        if ($singleRound !== []) {
-                            $trailRounds = [$singleRound];
-                        }
-                    }
-                }
-            }
-
-            if ($trailRounds !== []) {
-                $configuredPoints[$pointIndex]['trailRounds'] = $trailRounds;
-                $configuredPoints[$pointIndex]['trail'] = $trailRounds[count($trailRounds) - 1];
-            }
-        }
-
-        return $configuredPoints;
-    }
 
     private function ApplyPointVariableTrails(array $configuredPoints): array
     {
@@ -700,7 +579,9 @@ class OpenStreetMap extends IPSModule
                 'latitude' => $latitude,
                 'longitude' => $longitude,
                 'icon' => $icon,
-                'includeInZoom' => array_key_exists('IncludeInZoom', $point) ? (bool)$point['IncludeInZoom'] : true
+                'includeInZoom' => array_key_exists('IncludeInZoom', $point) ? (bool)$point['IncludeInZoom'] : true,
+                'type' => 'fixed',
+                'historyEligible' => false
             ];
         }
 
