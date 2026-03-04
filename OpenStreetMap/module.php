@@ -8,6 +8,8 @@ class OpenStreetMap extends IPSModule
     private const ARCHIVE_MODULE_GUID = '{43192F0B-135B-4CE7-A0A7-1475603F3060}';
     private const DEFAULT_TRAIL_MINUTES = 60;
     private const DEFAULT_TRAIL_POINTS = 200;
+    private const POINT_TRAIL_MINUTES_MAX = 525600; // 365 Tage
+    private const TRACK_ARCHIVE_ROUND_LIMIT = 10;
 
     /**
      * In contrast to Construct, this function is called only once when creating the instance and starting IP-Symcon.
@@ -283,7 +285,7 @@ class OpenStreetMap extends IPSModule
                 'trailRounds' => [],
                 'includeInZoom' => array_key_exists('IncludeInZoom', $point) ? (bool)$point['IncludeInZoom'] : true,
                 'showTrail' => array_key_exists('ShowTrail', $point) ? (bool)$point['ShowTrail'] : true,
-                'trailMinutes' => $this->NormalizeTrailMinutes($point['TrailMinutes'] ?? null),
+                'trailMinutes' => $this->NormalizeTrailMinutes($point['TrailMinutes'] ?? null, self::DEFAULT_TRAIL_MINUTES, self::POINT_TRAIL_MINUTES_MAX),
                 '__nameKey' => $this->NormalizePointName($name),
                 '__latitudeID' => $latID,
                 '__longitudeID' => $lonID,
@@ -385,8 +387,7 @@ class OpenStreetMap extends IPSModule
                         $archiveWarningIssued = true;
                     }
                 } else {
-                    $trailMinutes = $this->NormalizeTrailMinutes($track['TrackMinutes'] ?? null);
-                    $trailRounds = $this->BuildTrailRoundsFromArchive($archiveID, $trackVariableID, $trailMinutes, $trailMaxPoints);
+                    $trailRounds = $this->BuildTrailRoundsFromArchive($archiveID, $trackVariableID, $trailMaxPoints, self::TRACK_ARCHIVE_ROUND_LIMIT);
                 }
             }
 
@@ -457,7 +458,7 @@ class OpenStreetMap extends IPSModule
                 continue;
             }
 
-            $trailMinutes = $this->NormalizeTrailMinutes($point['trailMinutes'] ?? null);
+            $trailMinutes = $this->NormalizeTrailMinutes($point['trailMinutes'] ?? null, self::DEFAULT_TRAIL_MINUTES, self::POINT_TRAIL_MINUTES_MAX);
             $trail = $this->BuildPointTrailFromArchive($archiveID, $latitudeID, $longitudeID, $trailMinutes, $maxPoints);
 
             if ($trail !== []) {
@@ -692,17 +693,14 @@ class OpenStreetMap extends IPSModule
         return null;
     }
 
-    private function BuildTrailRoundsFromArchive(int $archiveID, int $trackVariableID, int $durationMinutes, int $maxPoints): array
+    private function BuildTrailRoundsFromArchive(int $archiveID, int $trackVariableID, int $maxPoints, int $entryLimit): array
     {
         if (!function_exists('AC_GetLoggedValues')) {
             return [];
         }
 
-        $endTime = time();
-        $startTime = $endTime - ($durationMinutes * 60);
-
         try {
-            $values = AC_GetLoggedValues($archiveID, $trackVariableID, $startTime, $endTime, 0);
+            $values = AC_GetLoggedValues($archiveID, $trackVariableID, 0, time(), 0);
         } catch (\Throwable $exception) {
             $this->SendDebug(__FUNCTION__, sprintf('Archive query failed: %s', $exception->getMessage()), 0);
             return [];
@@ -710,6 +708,10 @@ class OpenStreetMap extends IPSModule
 
         if (!is_array($values) || $values === []) {
             return [];
+        }
+
+        if ($entryLimit > 0 && count($values) > $entryLimit) {
+            $values = array_slice($values, -$entryLimit);
         }
 
         $rounds = [];
@@ -987,19 +989,19 @@ class OpenStreetMap extends IPSModule
         return array_values($filtered);
     }
 
-    private function NormalizeTrailMinutes($value): int
+    private function NormalizeTrailMinutes($value, int $default = self::DEFAULT_TRAIL_MINUTES, int $maximum = 1440): int
     {
         $minutes = (int)$value;
         if ($minutes <= 0) {
-            $minutes = self::DEFAULT_TRAIL_MINUTES;
+            $minutes = $default;
         }
 
         if ($minutes < 5) {
             return 5;
         }
 
-        if ($minutes > 1440) {
-            return 1440;
+        if ($minutes > $maximum) {
+            return $maximum;
         }
 
         return $minutes;
