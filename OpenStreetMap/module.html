@@ -261,8 +261,7 @@
 
                 historyControls.select.addEventListener('change', () => {
                     historyState.selectedTrack = historyControls.select.selectedIndex;
-                    const selectedRounds = getSelectedRounds();
-                    historyState.selectedRound = selectedRounds.length > 0 ? selectedRounds.length - 1 : 0;
+                    historyState.selectedRound = 0;
                     renderHistorySelection();
                 });
 
@@ -272,7 +271,7 @@
                         return;
                     }
 
-                    historyState.selectedRound = Math.max(0, historyState.selectedRound - 1);
+                    historyState.selectedRound = Math.min(selectedRounds.length - 1, historyState.selectedRound + 1);
                     renderHistorySelection();
                 });
 
@@ -282,7 +281,7 @@
                         return;
                     }
 
-                    historyState.selectedRound = Math.min(selectedRounds.length - 1, historyState.selectedRound + 1);
+                    historyState.selectedRound = Math.max(0, historyState.selectedRound - 1);
                     renderHistorySelection();
                 });
             }
@@ -320,7 +319,7 @@
                 historyControls.select.selectedIndex = historyState.selectedTrack;
 
                 const selectedRounds = getSelectedRounds();
-                historyState.selectedRound = Math.min(historyState.selectedRound, selectedRounds.length - 1);
+                historyState.selectedRound = 0;
                 if (historyState.selectedRound < 0) {
                     historyState.selectedRound = 0;
                 }
@@ -433,7 +432,12 @@
                             timestamp: (typeof timestampValue === 'number') ? timestampValue : null
                         };
                     })
-                    .filter((round) => round !== null);
+                    .filter((round) => round !== null)
+                    .sort((left, right) => {
+                        const leftTs = (typeof left.timestamp === 'number') ? left.timestamp : 0;
+                        const rightTs = (typeof right.timestamp === 'number') ? right.timestamp : 0;
+                        return rightTs - leftTs;
+                    });
             }
 
             function getSelectedRound() {

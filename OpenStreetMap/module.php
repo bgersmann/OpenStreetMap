@@ -10,6 +10,7 @@ class OpenStreetMap extends IPSModule
     private const DEFAULT_TRAIL_POINTS = 200;
     private const POINT_TRAIL_MINUTES_MAX = 525600; // 365 Tage
     private const TRACK_ARCHIVE_ROUND_LIMIT = 10;
+    private const VM_UPDATE_MESSAGE = 10603;
 
     /**
      * In contrast to Construct, this function is called only once when creating the instance and starting IP-Symcon.
@@ -54,8 +55,25 @@ class OpenStreetMap extends IPSModule
 
         $this->MaintainReferences();
 
+        $this->PushVisualizationUpdate();
+
         // Set status
         $this->SetStatus(102);
+    }
+
+    public function MessageSink($TimeStamp, $SenderID, $Message, $Data)
+    {
+        parent::MessageSink($TimeStamp, $SenderID, $Message, $Data);
+
+        if ($Message !== $this->GetVariableUpdateMessageID()) {
+            return;
+        }
+
+        if (!in_array((int)$SenderID, $this->GetPointVariableIDs(), true)) {
+            return;
+        }
+
+        $this->PushVisualizationUpdate();
     }
 
 
@@ -632,7 +650,10 @@ class OpenStreetMap extends IPSModule
 
     private function MaintainReferences(): void
     {
+        $variableUpdateMessageID = $this->GetVariableUpdateMessageID();
+
         foreach ($this->GetReferenceList() as $referenceID) {
+            $this->UnregisterMessage($referenceID, $variableUpdateMessageID);
             $this->UnregisterReference($referenceID);
         }
 
@@ -643,7 +664,22 @@ class OpenStreetMap extends IPSModule
 
         foreach ($this->GetPointVariableIDs() as $variableID) {
             $this->RegisterReference($variableID);
+            $this->RegisterMessage($variableID, $variableUpdateMessageID);
         }
+    }
+
+    private function GetVariableUpdateMessageID(): int
+    {
+        if (defined('VM_UPDATE')) {
+            return VM_UPDATE;
+        }
+
+        return self::VM_UPDATE_MESSAGE;
+    }
+
+    private function PushVisualizationUpdate(): void
+    {
+        $this->UpdateVisualizationValue(json_encode($this->GetFullUpdateMessage()));
     }
 
     private function GetPointVariableIDs(): array
