@@ -710,6 +710,13 @@ class OpenStreetMap extends IPSModule
             return [];
         }
 
+        // Ensure deterministic chronology regardless of archive return order.
+        usort($values, static function (array $left, array $right): int {
+            $leftTimestamp = (int)($left['TimeStamp'] ?? 0);
+            $rightTimestamp = (int)($right['TimeStamp'] ?? 0);
+            return $leftTimestamp <=> $rightTimestamp;
+        });
+
         if ($entryLimit > 0 && count($values) > $entryLimit) {
             $values = array_slice($values, -$entryLimit);
         }
