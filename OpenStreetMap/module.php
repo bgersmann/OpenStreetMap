@@ -55,7 +55,9 @@ class OpenStreetMap extends IPSModule
 
         $this->MaintainReferences();
 
-        $this->PushVisualizationUpdate();
+        $this->InitializeVariableValueHashes();
+
+        $this->PushVisualizationUpdate(true);
 
         // Set status
         $this->SetStatus(102);
@@ -70,6 +72,10 @@ class OpenStreetMap extends IPSModule
         }
 
         if (!in_array((int)$SenderID, $this->GetPointVariableIDs(), true)) {
+            return;
+        }
+
+        if (!$this->HasTrackedVariableChanged((int)$SenderID)) {
             return;
         }
 
@@ -677,9 +683,62 @@ class OpenStreetMap extends IPSModule
         return self::VM_UPDATE_MESSAGE;
     }
 
-    private function PushVisualizationUpdate(): void
+    private function PushVisualizationUpdate(bool $force = false): void
     {
-        $this->UpdateVisualizationValue(json_encode($this->GetFullUpdateMessage()));
+        $payload = $this->GetFullUpdateMessage();
+        $payloadJson = json_encode($payload);
+        if (!is_string($payloadJson)) {
+            return;
+        }
+
+        $payloadHash = md5($payloadJson);
+        if (!$force && $this->GetBuffer('LastVisualizationPayloadHash') === $payloadHash) {
+            return;
+        }
+
+        $this->SetBuffer('LastVisualizationPayloadHash', $payloadHash);
+        $this->UpdateVisualizationValue($payloadJson);
+    }
+
+    private function InitializeVariableValueHashes(): void
+    {
+        $hashes = [];
+
+        foreach ($this->GetPointVariableIDs() as $variableID) {
+            if (!IPS_VariableExists($variableID)) {
+                continue;
+            }
+
+            $hashes[(string)$variableID] = $this->CreateStableValueHash(GetValue($variableID));
+        }
+
+        $this->SetBuffer('TrackedVariableValueHashes', json_encode($hashes));
+    }
+
+    private function HasTrackedVariableChanged(int $variableID): bool
+    {
+        if (!IPS_VariableExists($variableID)) {
+            return false;
+        }
+
+        $hashes = json_decode($this->GetBuffer('TrackedVariableValueHashes'), true);
+        if (!is_array($hashes)) {
+            $hashes = [];
+        }
+
+        $key = (string)$variableID;
+        $currentHash = $this->CreateStableValueHash(GetValue($variableID));
+        $hasChanged = !array_key_exists($key, $hashes) || $hashes[$key] !== $currentHash;
+
+        $hashes[$key] = $currentHash;
+        $this->SetBuffer('TrackedVariableValueHashes', json_encode($hashes));
+
+        return $hasChanged;
+    }
+
+    private function CreateStableValueHash($value): string
+    {
+        return md5(serialize($value));
     }
 
     private function GetPointVariableIDs(): array
