@@ -72,59 +72,46 @@
                 {
                     "caption": "Icon (optional)",
                     "name": "Icon",
-                    "width": "230px",
+                    "width": "180px",
                     "add": "",
                     "edit": {
                         "type": "Select",
                         "options": [
-                            {
-                                "caption": "Standard (Kreis)",
-                                "value": ""
-                            },
-                            {
-                                "caption": "Feuerwehr",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/firestation.svg"
-                            },
-                            {
-                                "caption": "Krankenhaus",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/hospital.svg"
-                            },
-                            {
-                                "caption": "Polizei",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/police.svg"
-                            },
-                            {
-                                "caption": "Parkplatz",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/parking.svg"
-                            },
-                            {
-                                "caption": "Schule",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/school.svg"
-                            },
-                            {
-                                "caption": "Post",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/post_office.svg"
-                            },
-                            {
-                                "caption": "Restaurant",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/restaurant.svg"
-                            },
-                            {
-                                "caption": "Aussichtspunkt",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/tourism/viewpoint.svg"
-                            },
-                            {
-                                "caption": "Information",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/tourism/information.svg"
-                            },
-                            {
-                                "caption": "Hund",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/shop/pet.svg"
-                            },
-                            {
-                                "caption": "Nadel",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/leisure/golf_pin.svg"
-                            }
+                            { "caption": "Standard (Kreis)", "value": "" },
+                            { "caption": "Auto / Kfz", "value": "car" },
+                            { "caption": "Feuerwehr", "value": "firestation" },
+                            { "caption": "Krankenhaus", "value": "hospital" },
+                            { "caption": "Polizei", "value": "police" },
+                            { "caption": "Parkplatz", "value": "parking" },
+                            { "caption": "Schule", "value": "school" },
+                            { "caption": "Post", "value": "post" },
+                            { "caption": "Restaurant", "value": "restaurant" },
+                            { "caption": "Aussichtspunkt", "value": "viewpoint" },
+                            { "caption": "Information", "value": "information" },
+                            { "caption": "Hund", "value": "dog" },
+                            { "caption": "Nadel", "value": "pin" }
+                        ]
+                    }
+                },
+                {
+                    "caption": "Icon-Farbe",
+                    "name": "IconColor",
+                    "width": "140px",
+                    "add": "",
+                    "edit": {
+                        "type": "Select",
+                        "options": [
+                            { "caption": "Standard", "value": "" },
+                            { "caption": "Rot", "value": "#e23b3b" },
+                            { "caption": "Orange", "value": "#ef8a17" },
+                            { "caption": "Gelb", "value": "#f4c20d" },
+                            { "caption": "Grün", "value": "#2ec27e" },
+                            { "caption": "Türkis", "value": "#0ef6cc" },
+                            { "caption": "Blau", "value": "#2f7ef6" },
+                            { "caption": "Violett", "value": "#8a5cf6" },
+                            { "caption": "Pink", "value": "#ec4ea3" },
+                            { "caption": "Weiß", "value": "#ffffff" },
+                            { "caption": "Schwarz", "value": "#222222" }
                         ]
                     }
                 },
@@ -260,59 +247,46 @@
                 {
                     "caption": "Icon (optional)",
                     "name": "Icon",
-                    "width": "230px",
+                    "width": "180px",
                     "add": "",
                     "edit": {
                         "type": "Select",
                         "options": [
-                            {
-                                "caption": "Standard (Kreis)",
-                                "value": ""
-                            },
-                            {
-                                "caption": "Feuerwehr",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/firestation.svg"
-                            },
-                            {
-                                "caption": "Krankenhaus",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/hospital.svg"
-                            },
-                            {
-                                "caption": "Polizei",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/police.svg"
-                            },
-                            {
-                                "caption": "Parkplatz",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/parking.svg"
-                            },
-                            {
-                                "caption": "Schule",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/school.svg"
-                            },
-                            {
-                                "caption": "Post",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/post_office.svg"
-                            },
-                            {
-                                "caption": "Restaurant",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/amenity/restaurant.svg"
-                            },
-                            {
-                                "caption": "Aussichtspunkt",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/tourism/viewpoint.svg"
-                            },
-                            {
-                                "caption": "Information",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/tourism/information.svg"
-                            },
-                            {
-                                "caption": "Hund",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/shop/pet.svg"
-                            },
-                            {
-                                "caption": "Nadel",
-                                "value": "https://raw.githubusercontent.com/openstreetmap-carto/openstreetmap-carto/master/symbols/leisure/golf_pin.svg"
-                            }
+                            { "caption": "Standard (Kreis)", "value": "" },
+                            { "caption": "Auto / Kfz", "value": "car" },
+                            { "caption": "Feuerwehr", "value": "firestation" },
+                            { "caption": "Krankenhaus", "value": "hospital" },
+                            { "caption": "Polizei", "value": "police" },
+                            { "caption": "Parkplatz", "value": "parking" },
+                            { "caption": "Schule", "value": "school" },
+                            { "caption": "Post", "value": "post" },
+                            { "caption": "Restaurant", "value": "restaurant" },
+                            { "caption": "Aussichtspunkt", "value": "viewpoint" },
+                            { "caption": "Information", "value": "information" },
+                            { "caption": "Hund", "value": "dog" },
+                            { "caption": "Nadel", "value": "pin" }
+                        ]
+                    }
+                },
+                {
+                    "caption": "Icon-Farbe",
+                    "name": "IconColor",
+                    "width": "140px",
+                    "add": "",
+                    "edit": {
+                        "type": "Select",
+                        "options": [
+                            { "caption": "Standard", "value": "" },
+                            { "caption": "Rot", "value": "#e23b3b" },
+                            { "caption": "Orange", "value": "#ef8a17" },
+                            { "caption": "Gelb", "value": "#f4c20d" },
+                            { "caption": "Grün", "value": "#2ec27e" },
+                            { "caption": "Türkis", "value": "#0ef6cc" },
+                            { "caption": "Blau", "value": "#2f7ef6" },
+                            { "caption": "Violett", "value": "#8a5cf6" },
+                            { "caption": "Pink", "value": "#ec4ea3" },
+                            { "caption": "Weiß", "value": "#ffffff" },
+                            { "caption": "Schwarz", "value": "#222222" }
                         ]
                     }
                 },

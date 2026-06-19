@@ -6,6 +6,7 @@ declare(strict_types=1);
 class OpenStreetMap extends IPSModule
 {
     private const ARCHIVE_MODULE_GUID = '{43192F0B-135B-4CE7-A0A7-1475603F3060}';
+    private const ICON_KEYS = ['car', 'firestation', 'hospital', 'police', 'parking', 'school', 'post', 'restaurant', 'viewpoint', 'information', 'dog', 'pin'];
     private const DEFAULT_TRAIL_MINUTES = 60;
     private const DEFAULT_TRAIL_POINTS = 200;
     private const POINT_TRAIL_MINUTES_MAX = 525600; // 365 Tage
@@ -298,13 +299,15 @@ class OpenStreetMap extends IPSModule
 
             $name = $this->ResolvePointName($point, $index, $latID);
 
-            $icon = $this->NormalizeIconUrl($point['Icon'] ?? '');
+            $icon = $this->NormalizeIcon($point['Icon'] ?? '');
+            $iconColor = $this->NormalizeIconColor($point['IconColor'] ?? '');
 
             $result[] = [
                 'name' => $name,
                 'latitude' => $latitude,
                 'longitude' => $longitude,
                 'icon' => $icon,
+                'iconColor' => $iconColor,
                 'trail' => [],
                 'trailRounds' => [],
                 'includeInZoom' => array_key_exists('IncludeInZoom', $point) ? (bool)$point['IncludeInZoom'] : true,
@@ -346,6 +349,7 @@ class OpenStreetMap extends IPSModule
                 'latitude' => (float)$latitude,
                 'longitude' => (float)$longitude,
                 'icon' => $point['icon'],
+                'iconColor' => $point['iconColor'] ?? null,
                 'includeInZoom' => (bool)$point['includeInZoom'],
                 'type' => 'point',
                 'historyEligible' => false
@@ -597,13 +601,15 @@ class OpenStreetMap extends IPSModule
                 $name = sprintf('Fester Punkt %d', $index + 1);
             }
 
-            $icon = $this->NormalizeIconUrl($point['Icon'] ?? '');
+            $icon = $this->NormalizeIcon($point['Icon'] ?? '');
+            $iconColor = $this->NormalizeIconColor($point['IconColor'] ?? '');
 
             $result[] = [
                 'name' => $name,
                 'latitude' => $latitude,
                 'longitude' => $longitude,
                 'icon' => $icon,
+                'iconColor' => $iconColor,
                 'includeInZoom' => array_key_exists('IncludeInZoom', $point) ? (bool)$point['IncludeInZoom'] : true,
                 'type' => 'fixed',
                 'historyEligible' => false
@@ -611,6 +617,44 @@ class OpenStreetMap extends IPSModule
         }
 
         return $result;
+    }
+
+    private function NormalizeIcon($icon): ?string
+    {
+        if (!is_string($icon)) {
+            return null;
+        }
+
+        $trimmed = trim($icon);
+        if ($trimmed === '') {
+            return null;
+        }
+
+        // Built-in inline icon keys (rendered and colored client side).
+        if (in_array(strtolower($trimmed), self::ICON_KEYS, true)) {
+            return strtolower($trimmed);
+        }
+
+        // Backward compatibility: previously stored external icon URLs.
+        return $this->NormalizeIconUrl($trimmed);
+    }
+
+    private function NormalizeIconColor($color): ?string
+    {
+        if (!is_string($color)) {
+            return null;
+        }
+
+        $trimmed = trim($color);
+        if ($trimmed === '') {
+            return null;
+        }
+
+        if (!preg_match('/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/', $trimmed)) {
+            return null;
+        }
+
+        return strtolower($trimmed);
     }
 
     private function NormalizeIconUrl($icon): ?string
