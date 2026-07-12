@@ -86,6 +86,19 @@ class OpenStreetMap extends IPSModule
 
 
     /**
+     * Receives actions from the visualization (requestAction in module.html).
+     */
+    public function RequestAction($Ident, $Value)
+    {
+        if ($Ident === 'DebugLog') {
+            $this->SendDebug('Visu', (string)$Value, 0);
+            return;
+        }
+
+        throw new Exception(sprintf('Invalid ident "%s"', $Ident));
+    }
+
+    /**
      * If the HTML-SDK is to be used, this function must be overwritten in order to return the HTML content.
      */
     public function GetVisualizationTile()

@@ -192,12 +192,36 @@
                 status: null
             };
 
+            // Debug-Meldungen an das Modul melden (sichtbar im Instanz-Debug),
+            // damit sich das Verhalten in der App nachvollziehen lässt.
+            const debugLog = [];
+            function reportDebug(message) {
+                const line = new Date().toISOString().slice(11, 23) + ' ' + message;
+                debugLog.push(line);
+                if (debugLog.length > 200) {
+                    debugLog.shift();
+                }
+                try {
+                    if (typeof requestAction === 'function') {
+                        requestAction('DebugLog', line);
+                    }
+                } catch (error) {
+                    // Debug darf die Karte nie beeinträchtigen
+                }
+            }
+            window.__osmDebugLog = debugLog;
+
+            window.addEventListener('error', (event) => {
+                reportDebug('JS-Fehler: ' + event.message);
+            });
+
             function parsePayload(data) {
                 if (typeof data === 'string') {
                     try {
                         return JSON.parse(data);
                     } catch (error) {
                         console.error('Fehler beim Parsen der Daten:', error);
+                        reportDebug('Payload nicht parsebar (' + data.length + ' Zeichen)');
                         return {};
                     }
                 }
@@ -253,21 +277,55 @@
                     }, { passive: true });
                 });
 
-                // Die App-WebView kann den Canvas-Puffer beim Fokuswechsel
-                // (langes Drücken auf die Kachel) oder bei Recomposition
-                // verwerfen. Karte und Vektorebene dann neu zeichnen.
+                // Die App-WebView kann den Fensterzustand beim Fokuswechsel
+                // (langes Drücken auf die Kachel) verändern. Ereignisse melden
+                // und Karte zur Sicherheit neu zeichnen.
                 ['visibilitychange', 'pageshow', 'focus'].forEach((eventName) => {
                     const target = eventName === 'visibilitychange' ? document : window;
                     target.addEventListener(eventName, () => {
+                        reportDebug('Ereignis: ' + eventName + (document.hidden ? ' (hidden)' : ''));
                         if (document.hidden) {
                             return;
                         }
                         setTimeout(refreshMapView, 100);
                     });
                 });
+                window.addEventListener('resize', () => {
+                    reportDebug('Ereignis: resize ' + window.innerWidth + 'x' + window.innerHeight);
+                });
                 container.addEventListener('touchend', () => {
                     setTimeout(refreshMapView, 100);
                 }, { passive: true });
+
+                // Watchdog: meldet, wenn Marker/Routen oder die SVG-Ebene
+                // unerwartet verschwinden, und repariert eine leere Ebene.
+                let lastWatchdogState = '';
+                setInterval(() => {
+                    if (!mapInstance) {
+                        return;
+                    }
+
+                    const svg = container.querySelector('.leaflet-overlay-pane svg');
+                    const svgWidth = svg ? Number(svg.getAttribute('width')) : -1;
+                    const svgHeight = svg ? Number(svg.getAttribute('height')) : -1;
+                    const state = JSON.stringify({
+                        pfade: svg ? svg.querySelectorAll('path').length : -1,
+                        marker: container.querySelectorAll('.leaflet-marker-icon').length,
+                        svgGroesse: svgWidth + 'x' + svgHeight,
+                        karte: container.clientWidth + 'x' + container.clientHeight
+                    });
+
+                    if (state !== lastWatchdogState) {
+                        lastWatchdogState = state;
+                        reportDebug('Zustand: ' + state);
+                    }
+
+                    if (svg && (svgWidth <= 0 || svgHeight <= 0) && container.clientWidth > 0) {
+                        reportDebug('SVG-Ebene ohne Größe – erzwinge Update');
+                        mapInstance.invalidateSize();
+                        mapInstance.fire('moveend');
+                    }
+                }, 2000);
 
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -669,11 +727,24 @@
             }
 
             function processPayload(payload) {
-                const house = payload.house || {};
-                const points = payload.points || [];
-                updateHouseMarker(house);
-                updatePointLayer(points);
-                fitMapToContent(house, points);
+                const house = (payload && typeof payload.house === 'object' && payload.house !== null) ? payload.house : null;
+                const points = (payload && Array.isArray(payload.points)) ? payload.points : null;
+                reportDebug('Payload: house=' + (house ? 'ja' : 'fehlt') + ', points=' + (points ? points.length : 'fehlt'));
+
+                // Leere oder unlesbare Nachrichten (die App stellt beim
+                // Fokuswechsel den gespeicherten Visualisierungswert erneut
+                // zu) dürfen vorhandene Marker und Routen nicht löschen.
+                if (house === null && points === null) {
+                    return;
+                }
+
+                if (house !== null) {
+                    updateHouseMarker(house);
+                }
+                if (points !== null) {
+                    updatePointLayer(points);
+                }
+                fitMapToContent(house || {}, points || []);
             }
 
             document.addEventListener('DOMContentLoaded', () => {
