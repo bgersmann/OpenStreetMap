@@ -115,6 +115,7 @@
             let domReady = false;
             let mapInstance = null;
             let houseMarker = null;
+            let userHasMovedMap = false;
             const pointLayer = L.layerGroup();
             const trailLayer = L.layerGroup();
             let historyRoundLayer = null;
@@ -211,8 +212,21 @@
                 };
 
                 mapInstance = L.map('map', {
-                    zoomControl: false
+                    zoomControl: false,
+                    // Canvas statt SVG: die SVG-Ebene wird in der WebView der
+                    // Symcon-App beim Verschieben nicht neu gezeichnet und
+                    // verschwindet. padding rendert über den Viewport hinaus.
+                    renderer: L.canvas({ padding: 1 })
                 }).setView([target.latitude, target.longitude], target.zoom);
+
+                // Sobald der Nutzer selbst mit der Karte interagiert, darf ein
+                // Datenupdate die Ansicht nicht mehr per fitBounds zurücksetzen.
+                const container = mapInstance.getContainer();
+                ['pointerdown', 'touchstart', 'wheel'].forEach((eventName) => {
+                    container.addEventListener(eventName, () => {
+                        userHasMovedMap = true;
+                    }, { passive: true });
+                });
 
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -323,7 +337,7 @@
                 historyControls.select.addEventListener('change', () => {
                     historyState.selectedTrack = historyControls.select.selectedIndex;
                     historyState.selectedRound = 0;
-                    renderHistorySelection();
+                    renderHistorySelection(true);
                 });
 
                 historyControls.prevButton.addEventListener('click', () => {
@@ -333,7 +347,7 @@
                     }
 
                     historyState.selectedRound = Math.min(selectedRounds.length - 1, historyState.selectedRound + 1);
-                    renderHistorySelection();
+                    renderHistorySelection(true);
                 });
 
                 historyControls.nextButton.addEventListener('click', () => {
@@ -343,7 +357,7 @@
                     }
 
                     historyState.selectedRound = Math.max(0, historyState.selectedRound - 1);
-                    renderHistorySelection();
+                    renderHistorySelection(true);
                 });
             }
 
@@ -379,13 +393,12 @@
                 historyState.selectedTrack = Math.min(historyState.selectedTrack, historyState.tracks.length - 1);
                 historyControls.select.selectedIndex = historyState.selectedTrack;
 
+                // Auswahl über Datenupdates hinweg beibehalten, nur auf den
+                // gültigen Bereich begrenzen.
                 const selectedRounds = getSelectedRounds();
-                historyState.selectedRound = 0;
-                if (historyState.selectedRound < 0) {
-                    historyState.selectedRound = 0;
-                }
+                historyState.selectedRound = Math.min(Math.max(historyState.selectedRound, 0), Math.max(selectedRounds.length - 1, 0));
 
-                renderHistorySelection();
+                renderHistorySelection(false);
             }
 
             function getSelectedRounds() {
@@ -393,7 +406,7 @@
                 return selected && Array.isArray(selected.rounds) ? selected.rounds : [];
             }
 
-            function renderHistorySelection() {
+            function renderHistorySelection(fitView) {
                 const selected = historyState.tracks[historyState.selectedTrack];
                 if (!selected) {
                     return;
@@ -428,11 +441,15 @@
                     lineCap: 'round'
                 }).addTo(mapInstance);
 
-                const roundBounds = L.latLngBounds(round.coords);
-                mapInstance.fitBounds(roundBounds.pad(0.12), {
-                    animate: true,
-                    maxZoom: 18
-                });
+                // Nur bei bewusster Auswahl (Dropdown, Vor/Zurück) heranzoomen —
+                // Datenupdates im Hintergrund lassen die Ansicht unangetastet.
+                if (fitView) {
+                    const roundBounds = L.latLngBounds(round.coords);
+                    mapInstance.fitBounds(roundBounds.pad(0.12), {
+                        animate: true,
+                        maxZoom: 18
+                    });
+                }
 
                 historyRoundLayer.bindPopup(`<strong>${selected.name}</strong><br>Runde ${roundIndex + 1} / ${rounds.length}${timestampText ? '<br>' + timestampText : ''}${distanceKm !== null ? `<br>Distanz: ${distanceKm.toFixed(2)} km` : ''}`);
             }
@@ -561,7 +578,7 @@
 
             // Keep viewport adjusted so that all markers remain visible.
             function fitMapToContent(house, points) {
-                if (!mapInstance) {
+                if (!mapInstance || userHasMovedMap) {
                     return;
                 }
 
