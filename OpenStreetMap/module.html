@@ -221,7 +221,6 @@
                         return JSON.parse(data);
                     } catch (error) {
                         console.error('Fehler beim Parsen der Daten:', error);
-                        reportDebug('Payload nicht parsebar (' + data.length + ' Zeichen)');
                         return {};
                     }
                 }
@@ -278,28 +277,23 @@
                 });
 
                 // Die App-WebView kann den Fensterzustand beim Fokuswechsel
-                // (langes Drücken auf die Kachel) verändern. Ereignisse melden
-                // und Karte zur Sicherheit neu zeichnen.
+                // (langes Drücken auf die Kachel) verändern. Karte zur
+                // Sicherheit neu zeichnen.
                 ['visibilitychange', 'pageshow', 'focus'].forEach((eventName) => {
                     const target = eventName === 'visibilitychange' ? document : window;
                     target.addEventListener(eventName, () => {
-                        reportDebug('Ereignis: ' + eventName + (document.hidden ? ' (hidden)' : ''));
                         if (document.hidden) {
                             return;
                         }
                         setTimeout(refreshMapView, 100);
                     });
                 });
-                window.addEventListener('resize', () => {
-                    reportDebug('Ereignis: resize ' + window.innerWidth + 'x' + window.innerHeight);
-                });
                 container.addEventListener('touchend', () => {
                     setTimeout(refreshMapView, 100);
                 }, { passive: true });
 
-                // Watchdog: meldet, wenn Marker/Routen oder die SVG-Ebene
-                // unerwartet verschwinden, und repariert eine leere Ebene.
-                let lastWatchdogState = '';
+                // Watchdog: repariert eine SVG-Ebene ohne Größe (verlorene
+                // Recomposition der App-WebView).
                 setInterval(() => {
                     if (!mapInstance) {
                         return;
@@ -308,17 +302,6 @@
                     const svg = container.querySelector('.leaflet-overlay-pane svg');
                     const svgWidth = svg ? Number(svg.getAttribute('width')) : -1;
                     const svgHeight = svg ? Number(svg.getAttribute('height')) : -1;
-                    const state = JSON.stringify({
-                        pfade: svg ? svg.querySelectorAll('path').length : -1,
-                        marker: container.querySelectorAll('.leaflet-marker-icon').length,
-                        svgGroesse: svgWidth + 'x' + svgHeight,
-                        karte: container.clientWidth + 'x' + container.clientHeight
-                    });
-
-                    if (state !== lastWatchdogState) {
-                        lastWatchdogState = state;
-                        reportDebug('Zustand: ' + state);
-                    }
 
                     if (svg && (svgWidth <= 0 || svgHeight <= 0) && container.clientWidth > 0) {
                         reportDebug('SVG-Ebene ohne Größe – erzwinge Update');
@@ -729,7 +712,6 @@
             function processPayload(payload) {
                 const house = (payload && typeof payload.house === 'object' && payload.house !== null) ? payload.house : null;
                 const points = (payload && Array.isArray(payload.points)) ? payload.points : null;
-                reportDebug('Payload: house=' + (house ? 'ja' : 'fehlt') + ', points=' + (points ? points.length : 'fehlt'));
 
                 // Leere oder unlesbare Nachrichten (die App stellt beim
                 // Fokuswechsel den gespeicherten Visualisierungswert erneut
