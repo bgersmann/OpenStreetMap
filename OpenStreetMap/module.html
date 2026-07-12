@@ -204,6 +204,28 @@
                 return data || {};
             }
 
+            // Erzwingt das Neuzeichnen der Canvas-Vektorebene, nachdem die
+            // WebView den Puffer verworfen hat (Fokuswechsel in der App).
+            function refreshMapView() {
+                if (!mapInstance) {
+                    return;
+                }
+
+                mapInstance.invalidateSize();
+
+                [pointLayer, trailLayer].forEach((group) => {
+                    group.eachLayer((layer) => {
+                        if (typeof layer.redraw === 'function') {
+                            layer.redraw();
+                        }
+                    });
+                });
+
+                if (historyRoundLayer && typeof historyRoundLayer.redraw === 'function') {
+                    historyRoundLayer.redraw();
+                }
+            }
+
             function initializeMap(center) {
                 const target = {
                     latitude: typeof center.latitude === 'number' ? center.latitude : defaults.latitude,
@@ -213,10 +235,13 @@
 
                 mapInstance = L.map('map', {
                     zoomControl: false,
-                    // Canvas statt SVG: die SVG-Ebene wird in der WebView der
-                    // Symcon-App beim Verschieben nicht neu gezeichnet und
-                    // verschwindet. padding rendert über den Viewport hinaus.
-                    renderer: L.canvas({ padding: 1 })
+                    // SVG statt Canvas: die Symcon-App (Flutter) setzt die
+                    // WebView-Platform-View beim Fokussieren neu zusammen.
+                    // Dabei geht ein Canvas-Puffer ohne DOM-Event verloren,
+                    // SVG als retained DOM wird dagegen automatisch neu
+                    // gezeichnet. padding rendert über den Viewport hinaus,
+                    // damit beim Verschieben keine Linien abgeschnitten sind.
+                    renderer: L.svg({ padding: 0.5 })
                 }).setView([target.latitude, target.longitude], target.zoom);
 
                 // Sobald der Nutzer selbst mit der Karte interagiert, darf ein
@@ -227,6 +252,22 @@
                         userHasMovedMap = true;
                     }, { passive: true });
                 });
+
+                // Die App-WebView kann den Canvas-Puffer beim Fokuswechsel
+                // (langes Drücken auf die Kachel) oder bei Recomposition
+                // verwerfen. Karte und Vektorebene dann neu zeichnen.
+                ['visibilitychange', 'pageshow', 'focus'].forEach((eventName) => {
+                    const target = eventName === 'visibilitychange' ? document : window;
+                    target.addEventListener(eventName, () => {
+                        if (document.hidden) {
+                            return;
+                        }
+                        setTimeout(refreshMapView, 100);
+                    });
+                });
+                container.addEventListener('touchend', () => {
+                    setTimeout(refreshMapView, 100);
+                }, { passive: true });
 
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
